@@ -1,0 +1,1 @@
+Display the impact on the price for each attributes
