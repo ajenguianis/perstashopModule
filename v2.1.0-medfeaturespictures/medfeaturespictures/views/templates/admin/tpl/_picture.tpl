@@ -22,19 +22,17 @@
             <ps-tabs position="top">
 
             {foreach from=$languages item=lang name=langue}
-
                 <ps-tab label="{$lang.name|escape:'html':'UTF-8'}" flag="../img/l/{$lang.id_lang}.jpg" {if $smarty.foreach.langue.first}active="true"{/if} id="tab2-1-{$smarty.foreach.langue.iteration}"{if $smarty.foreach.langue.total == 1} panel="false"{/if}>
-
                     {if $smarty.foreach.langue.total == 1}
-
                     <h4>{$lang.name|escape:'html':'UTF-8'}</h4>
-
                     {/if}
 
-                    <ps-form-group name="picture" label="{if $images[$lang.iso_code]|escape:'html':'UTF-8'}{l s='Replace image' mod='medfeaturespictures'}{else}{l s='New image' mod='medfeaturespictures'}{/if}">
-
+                    <ps-form-group name="picture" label="{if $images[$lang.iso_code]|escape:'html':'UTF-8'}
+{l s='Replace image' mod='medfeaturespictures'}
+{else}
+{l s='New image' mod='medfeaturespictures'}{/if}">
                         {$image_uploader.{$lang.iso_code}}
-
+                        {$image_uploader_miniat.{$lang.iso_code}}
                     </ps-form-group>
 
                     {if $smarty.foreach.langue.first && $smarty.foreach.langue.total > 1}

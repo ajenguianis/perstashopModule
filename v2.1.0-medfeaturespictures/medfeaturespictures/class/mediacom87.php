@@ -201,7 +201,21 @@ class MedFeaturesPicturesClass
             return false;
         }
     }
+    public function medGetFeatureImageMiniat($languages, $id_features_value, $rand = false)
+    {
+        $filename = $this->module->tpl_path.'/miniatures/'.$languages.'/'.(int)$id_features_value.'.jpg';
+        $filename_svg = $this->module->tpl_path.'/miniatures/'.$languages.'/'.(int)$id_features_value.'.svg';
 
+        if (Tools::file_exists_no_cache($filename)) {
+            $image = $this->module->_path.'miniatures/'.$languages.'/'.(int)$id_features_value.'.jpg';
+            return $image.($rand ? '?rand='.$rand : '');
+        } elseif (Tools::file_exists_no_cache($filename_svg)) {
+            $image = $this->module->_path.'miniatures/'.$languages.'/'.(int)$id_features_value.'.svg';
+            return $image.($rand ? '?rand='.$rand : '');
+        } else {
+            return false;
+        }
+    }
     public function medGetFeatureImageSize($languages, $id_features_value)
     {
         $filename = $this->module->tpl_path.'/pictures/'.$languages.'/'.(int)$id_features_value.'.jpg';
@@ -212,7 +226,16 @@ class MedFeaturesPicturesClass
             return false;
         }
     }
+    public function medGetFeatureImageMiniatSize($languages, $id_features_value)
+    {
+        $filename = $this->module->tpl_path.'/miniatures/'.$languages.'/'.(int)$id_features_value.'.jpg';
 
+        if (Tools::file_exists_no_cache($filename)) {
+            return filesize($filename);
+        } else {
+            return false;
+        }
+    }
     public function medListCmsPages($id_lang = null)
     {
         if (empty($id_lang)) {

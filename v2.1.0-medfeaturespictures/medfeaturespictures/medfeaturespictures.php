@@ -172,7 +172,7 @@ class MedFeaturesPictures extends Module
         /* Save Pictures */
         if (Tools::isSubmit('savepicture')) {
             $this->postProcessPicture($languages);
-
+            $this->postProcessMiniature($languages);
             if (!count($this->errors)) {
                 $output .= $this->displayConfirmation($this->l('Images updated'));
             }
@@ -193,6 +193,12 @@ class MedFeaturesPictures extends Module
             $output .= $this->displayConfirmation($this->l('Images deleted successfully'));
         } elseif (Tools::getValue('del_picture') && Tools::getValue('iso_code')) {
             $filename = $this->tpl_path.'/pictures/'.Tools::getValue('iso_code').'/'.Tools::getValue('del_picture').'.*';
+            foreach (glob($filename) as $file) {
+                unlink($file);
+            }
+            $output .= $this->displayConfirmation($this->l('Image deleted successfully'));
+        }elseif (Tools::getValue('del_picture_miniat') && Tools::getValue('iso_code')) {
+            $filename = $this->tpl_path.'/miniatures/'.Tools::getValue('iso_code').'/'.Tools::getValue('del_picture_miniat').'.*';
             foreach (glob($filename) as $file) {
                 unlink($file);
             }
@@ -321,6 +327,7 @@ class MedFeaturesPictures extends Module
             $feature_active = Feature::getFeature((int)$this->context->language->id, $id_feature);
 
             $images = array();
+            $imagesminiat = array();
             $image_uploader = array();
 
             foreach ($languages as $lang) {
@@ -337,9 +344,25 @@ class MedFeaturesPictures extends Module
                         .'&id_feature_value='.$id_feature_value;
                     $image_size = $this->mediacom87->medGetFeatureImageSize($lang['iso_code'], $id_feature_value) / 1000;
                 }
+                if (!$imagesminiat[$lang['iso_code']] = $this->mediacom87->medGetFeatureImageMiniat($lang['iso_code'], $id_feature_value, mt_rand())) {
+                    $imagesminiat[$lang['iso_code']] = null;
+                    $delete_url_miniat = null;
+                    $image_size_miniat = null;
+                } else {
+                    $delete_url_miniat = $form_url
+                        .'&del_picture_miniat='.$id_feature_value
+                        .'&iso_code='.$lang['iso_code']
+                        .'&action=edit_miniature&back_action='.Tools::getValue('back_action')
+                        .'&id_feature='.$id_feature
+                        .'&id_feature_value='.$id_feature_value;
+                    $image_size_miniat = $this->mediacom87->medGetFeatureImageMiniatSize($lang['iso_code'], $id_feature_value) / 1000;
+                }
                 $code = $this->medGenUploadByLang($lang['iso_code'], $images[$lang['iso_code']], $delete_url, $image_size);
+                $code_miniat = $this->medGenMiniatUploadByLang($lang['iso_code'], $imagesminiat[$lang['iso_code']], $delete_url_miniat, $image_size_miniat);
                 $image_uploader[$lang['iso_code']] = $code['html'];
+                $image_uploader_miniat[$lang['iso_code']] = $code_miniat['html'];
                 $script .= $code['script'];
+                $script .= $code_miniat['script'];
             }
 
             foreach (FeatureValue::getFeatureValueLang($id_feature_value) as $v) {
@@ -353,6 +376,7 @@ class MedFeaturesPictures extends Module
                 array(
                     'images' => $images,
                     'image_uploader' => $image_uploader,
+                    'image_uploader_miniat'=>$image_uploader_miniat,
                     'cms_pages' => $this->mediacom87->medListCmsPages((int)$this->context->language->id),
                     'feature_value_name' => $feature_value_name,
                     'id_feature_value' => $id_feature_value,
@@ -449,7 +473,28 @@ class MedFeaturesPictures extends Module
             'script' => '<script '.$script
         );
     }
+    public function medGenMiniatUploadByLang($iso_code, $url = null, $delete_url = null, $image_size = null)
+    {
+        $image_uploader = new HelperImageUploader('miniature_'.$iso_code);
+        if ($url) {
+            $file = array(
+                array(
+                    'type' => 'image',
+                    'image' => '<img class="img-responsive" src="'.$url.'" />',
+                    'size' => $image_size,
+                    'delete_url' => $delete_url
+                )
+            );
+            $image_uploader->setFiles($file);
+        }
 
+        $code = $image_uploader->render();
+        list($html, $script) = explode('<script ', $code);
+        return array(
+            'html' => $html,
+            'script' => '<script '.$script
+        );
+    }
     private function postProcess()
     {
         $this->conf['DISPLAY_TITLE']    = (int)Tools::getValue('DISPLAY_TITLE');
@@ -463,7 +508,8 @@ class MedFeaturesPictures extends Module
         $this->conf['hook']             = Tools::getValue('hook');
         $this->conf['image_width']      = (int)Tools::getValue('image_width');
         $this->conf['image_eight']      = (int)Tools::getValue('image_eight');
-
+        dump($this->conf);
+        exit;
         foreach (Language::getLanguages(false) as $lang) {
             $this->conf['blocktitletext'][(int)$lang['id_lang']] = (string)Tools::getValue('blocktitletext_'.(int)$lang['id_lang']);
         }
@@ -561,7 +607,63 @@ class MedFeaturesPictures extends Module
 
         $this->_clearCache('*');
     }
+    public function postProcessMiniature($languages)
+    {
+        $id_feature_value = (int)Tools::getValue('id_feature_value');
 
+        $same_image = (int)Tools::getValue('same_image');
+        $same_iso_code = false;
+        $svg_file = false;
+
+        foreach ($languages as $lang) {
+            $iso_code = $lang['iso_code'];
+            if ($same_image && $same_iso_code) {
+                $iso_code = $same_iso_code;
+            }
+
+            if (isset($_FILES['miniature_'.$iso_code]['tmp_name']) && $_FILES['miniature_'.$iso_code]['tmp_name']) {
+                $source = $_FILES['miniature_'.$iso_code]['tmp_name'];
+                if ($svg_file || mime_content_type($source) == 'image/svg+xml') {
+                    $svg_file = true;
+                    $dest = _PS_MODULE_DIR_.$this->name.'/miniatures/'.$lang['iso_code'].'/'.$id_feature_value.'.svg';
+                    if ($same_image && $same_iso_code) {
+                        $source = $this->tpl_path.'/miniatures/'.$iso_code.'/'.$id_feature_value.'.svg';
+                        if (!copy($source, $dest)) {
+                            $this->errors[] = sprintf($this->l('Error when saving the SVG image for %s'), $lang['name']);
+                        }
+                    } elseif (!move_uploaded_file($source, $dest)) {
+                        $this->errors[] = sprintf($this->l('Error when saving the SVG image for %s'), $lang['name']);
+                    } elseif ($same_image && !$same_iso_code) {
+                        $same_iso_code = $lang['iso_code'];
+                    }
+                } else {
+                    $dest = _PS_MODULE_DIR_.$this->name.'/miniatures/'.$lang['iso_code'].'/'.$id_feature_value.'.jpg';
+                    if (!ImageManager::resize($source, $dest, $this->conf['image_width'], $this->conf['image_eight'])) {
+                        if ($same_image) {
+                            $source = _PS_MODULE_DIR_.$this->name.'/miniatures/'.$iso_code.'/'.$id_feature_value.'.jpg';
+                            if (!ImageManager::resize($source, $dest, $this->conf['image_width'], $this->conf['image_eight'])) {
+                                $this->errors[] = sprintf($this->l('Error while saving the image for %s'), $lang['name']);
+                            }
+                        } else {
+                            $this->errors[] = sprintf($this->l('Error while saving the image for %s'), $lang['name']);
+                        }
+                    } elseif ($same_image && !$same_iso_code) {
+                        $same_iso_code = $lang['iso_code'];
+                    }
+                }
+            }
+        }
+
+        if (($id_cms = (int)Tools::getValue('id_cms')) && $id_cms != 9999999999) {
+            $this->conf['ID_CMS'][(int)$id_feature_value] = $id_cms;
+
+            if (!Configuration::updateValue($this->name, serialize($this->conf))) {
+                $this->errors[] = $this->l('Error during the recording of the defined CMS page link');
+            }
+        }
+
+        $this->_clearCache('*');
+    }
     private function checkIsoFolders($languages)
     {
         foreach ($languages as $lang) {
